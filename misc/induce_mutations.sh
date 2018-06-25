@@ -19,7 +19,7 @@
 
 module load samtools
 
-SCRIPTDIR=/short/xf1/src_big/somatic-variation/misc
+SCRIPTDIR=SCRIPTDIR=/disks/dacelo/data/analyses/02_RB7_false_negative_rate_analysis/05_test_induce_mutations/00_scripts
 BAMDIR=/short/xf1/Emel/induce_mutations
 
 #########################  get options and their arguments from command line

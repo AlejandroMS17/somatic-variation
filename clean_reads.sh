@@ -1,10 +1,10 @@
-#!/usr/bin/env bash
+#!/usr/bin/env bash #Adam's script 17/03/2017
 #bash clean_reads.sh -t THREADS -d DEST_DIRECTORY -k KMER_SIZE -f FILE_SUFFIX -s SEARCH_STRING -r REPLACE_STRING [-m MAX_MEMORY] [-c COVERAGE] READ_DIRECTORY 
 USAGE="Usage: $0 [-t THREADS] [-d DEST_DIRECTORY] [-k KMER_SIZE] [-f FILE_SUFFIX] [-1 SEARCH_STRING] [-2 REPLACE_STRING] [-m MAX_MEMORY] [-c COVERAGE] -i READ_DIRECTORY/"
 
-RCORRECTOR="run_rcorrector.pl"
-LOAD_COUNTING="load-into-counting.py"
-SLICE_BY_COV="slice-paired-reads-by-coverage.py"
+RCORRECTOR="perl /disks/dacelo/data/programs/github/Rcorrector/run_rcorrector.pl"
+LOAD_COUNTING="/disks/dacelo/data/programs/github/khmer/scripts/load-into-counting.py"
+SLICE_BY_COV="/disks/dacelo/data/programs/github/somatic-rob/slice-paired-reads-by-coverage.py"
 THREADS=48
 DEST_DIRECTORY=./cleaned_reads
 KMER_SIZE=32
@@ -14,9 +14,8 @@ REPLACE_STRING='R2' #pattern for search/replace to substitute second set of read
 MAX_MEMORY=64e9 #max memory to be given to khmer
 COVERAGE=40000 #max coverage tolerable  (see khmer slice-reads-by-coverage)
 READ_DIRECTORY=""
-SLICE_THREADS=""
 
-while getopts :t:d:k:f:1:2:m:c:i:s:h opt; do
+while getopts :t:d:k:f:1:2:m:c:i:h opt; do
 	case $opt in
 		t)
 			THREADS=$OPTARG
@@ -44,9 +43,6 @@ while getopts :t:d:k:f:1:2:m:c:i:s:h opt; do
 			;;
 		i)
 			READ_DIRECTORY=$OPTARG
-			;;
-		s)
-			SLICE_THREADS=$OPTARG
 			;;
 		h)
 			echo $USAGE >&2
@@ -82,14 +78,6 @@ if [ ! -d $READ_DIRECTORY ] ; then
 	exit 1
 fi
 
-if [ "$SLICE_THREADS" == "" ]; then
-	SLICE_THREADS=$((THREADS/6))
-fi
-
-if [ $SLICE_THREADS -eq 0 ]; then
-	SLICE_THREADS=1
-fi
-
 trap "exit 1" ERR
 
 CORR_SUFFIX=.cor${FILE_SUFFIX//.fastq/.fq}
@@ -113,7 +101,7 @@ export REPLACE_STRING
 export DEST_DIRECTORY
 export FILE_SUFFIX
 export CORR_SUFFIX
-parallel -j $SLICE_THREADS --env SLICE_BY_COV --env COVERAGE --env SEARCH_STRING --env REPLACE_STRING \
+parallel -j $THREADS --env SLICE_BY_COV --env COVERAGE --env SEARCH_STRING --env REPLACE_STRING \
 --env DEST_DIRECTORY --env FILE_SUFFIX --env CORR_SUFFIX 'F={}; G={/.}; \
 $SLICE_BY_COV -M $COVERAGE ${DEST_DIRECTORY}/khmer_count.graph $F ${F/$SEARCH_STRING/$REPLACE_STRING} \
 ${DEST_DIRECTORY}/sliced/${G}_sliced${FILE_SUFFIX} \

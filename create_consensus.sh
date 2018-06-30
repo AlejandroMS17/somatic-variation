@@ -9,7 +9,7 @@ BCFTOOLSFILE=""
 BAMFILE=""
 REFFILE=""
 TMPOPTION=""
-PICARD="picard"
+PICARD="java -jar /disks/dacelo/data/programs/picard.jar"
 
 while getopts :t:d:b:c:f:o:i:r:h opt; do
 	case $opt in

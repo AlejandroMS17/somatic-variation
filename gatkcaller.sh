@@ -8,8 +8,8 @@
 USAGE="Usage: $0 [-t THREADS] [-p PICARD_CMD] [-d TMPDIR] [-g  GATK_PATH] [-b BEDFILE] [-o OUTFILE] -r reference.fasta -i data.bam"
 
 #Here are some things you might want to change:
-PICARD="picard" #How do I call picard on this system?
-GATK="gatk" #How do I call GATK on this system?
+PICARD="java -jar /disks/dacelo/data/programs/picard.jar" #How do I call picard on this system?
+GATK="/disks/dacelo/data/programs/GenomeAnalysisTK.jar" #Location of your GATK jar
 CORES=48
 TMPOPTION=""
 OUTFILE=/dev/stdout
@@ -17,7 +17,6 @@ NUMNS=30
 BEDFILE=""
 REFERENCEFILE=""
 FILEIN=""
-HET="0.025"
 trap "exit 1" ERR
 
 while getopts :t:p:g:d:b:o:r:i:h opt; do
@@ -75,15 +74,12 @@ if [ "$REFERENCEFILE" == "" ]; then
 	exit 1
 fi
 
-if [ "$FILEIN" == "" ]; then
+if [ "FILEIN" == "" ]; then
 	echo $USAGE >&2
 	echo "Input file required." >&2
 	exit 1
 fi
 
-if [ "$TMPOPTION" != "" ]; then
-	mkdir -p $TMPOPTION #ensure temp directory exists if set
-fi
 
 TMPDIR=$(mktemp -d --tmpdir=$TMPOPTION gatkcaller_tmp_XXXXXX)
 # trap "rm -rf $TMPDIR" EXIT INT TERM HUP
@@ -113,7 +109,7 @@ OUTCALLS=$(mktemp --tmpdir=$TMPDIR --suffix=.vcf out_calls_XXX)
 RECALDATATABLE=$(mktemp --tmpdir=$TMPDIR --suffix=.table recal_data_XXX)
 
 
-$PICARD MarkDuplicates INPUT=$FILEIN OUTPUT=$DEDUPLIFIEDBAM METRICS_FILE=$METRICFILE MAX_FILE_HANDLES_FOR_READ_ENDS_MAP=1000
+$PICARD MarkDuplicates INPUT=$FILEIN OUTPUT=$DEDUPLIFIEDBAM METRICS_FILE=$METRICFILE MAX_FILE_HANDLES_FOR_READ_ENDS_MAP=1000 TMP_DIR=/disks/dacelo/data/analyses/RB5_data_analysis/09_call_variants_RB5/tmp_0
 
 if [ ! -e ${REFERENCEFILE}.fai ]; then
 	samtools faidx $REFERENCEFILE
@@ -126,19 +122,23 @@ fi
 $PICARD BuildBamIndex INPUT=${DEDUPLIFIEDBAM}
 
 #GATK TO RECALIBRATE QUAL SCORES + CALL VARIANTS
-gatk SplitIntervals -R ${REFERENCEFILE} --scatter-count $CORES -L scaffold_1  -L scaffold_2 -L scaffold_3 -L scaffold_4 -L scaffold_5 -L scaffold_6 -L scaffold_7 -L scaffold_8 -L scaffold_9 -L scaffold_10 -L scaffold_11 -O ${SCATTEREDINTERVALDIR}
+$PICARD ScatterIntervalsByNs R=${REFERENCEFILE} OT=ACGT MAX_TO_MERGE=${NUMNS} O=${FULLINTERVALS}
+$PICARD IntervalListTools I=${FULLINTERVALS} SCATTER_COUNT=$CORES O=${SCATTEREDINTERVALDIR}
 SCATTEREDINTERVALS=$(find ${SCATTEREDINTERVALDIR} -name '*.interval_list')
-parallel --halt 2 ${GATK} HaplotypeCaller --heterozygosity ${HET} -R ${REFERENCEFILE} -I $DEDUPLIFIEDBAM -L {1} ${BEDFILE} -stand_call_conf 50 -ploidy 2 -o {2} ::: $SCATTEREDINTERVALS :::+ $SCATTEREDFIRSTCALLS
-
-$PICARD SortVcf ${CMDFIRSTCALLS} O=${SORTEDFIRSTCALLS} SEQUENCE_DICTIONARY=${REFERENCEDICT}
+parallel --halt 2 java -jar ${GATK} -T HaplotypeCaller --pair_hmm_implementation LOGLESS_CACHING -R ${REFERENCEFILE} -I $DEDUPLIFIEDBAM -L {1} ${BEDFILE} -stand_call_conf 50 -ploidy 2 -o {2} ::: $SCATTEREDINTERVALS :::+ $SCATTEREDFIRSTCALLS
+# java -cp ${GATK} org.broadinstitute.gatk.tools.CatVariants -R ${REFERENCEFILE} --outputFile ${JOINEDFIRSTCALLS} ${CMDFIRSTCALLS}
+# bcftools concat -a -Ov -o ${JOINEDFIRSTCALLS} ${SCATTEREDFIRSTCALLS}
+$PICARD SortVcf ${CMDFIRSTCALLS} O=${SORTEDFIRSTCALLS} SEQUENCE_DICTIONARY=${REFERENCEDICT} TMP_DIR=/disks/dacelo/data/analyses/RB5_data_analysis/09_call_variants_RB5/tmp_0
 rm $SCATTEREDFIRSTCALLS ${SORTEDFIRSTCALLS}.idx
-
-${GATK} BaseRecalibrator -nct $CORES -I $DEDUPLIFIEDBAM -R ${REFERENCEFILE} ${BEDFILE} --knownSites $SORTEDFIRSTCALLS -o $RECALDATATABLE
+# rm $JOINEDFIRSTCALLS
+java -jar ${GATK} -T BaseRecalibrator -nct $CORES -I $DEDUPLIFIEDBAM -R ${REFERENCEFILE} ${BEDFILE} --knownSites $SORTEDFIRSTCALLS -o $RECALDATATABLE
 rm $SORTEDFIRSTCALLS
-${GATK} ApplyBQSR -I $DEDUPLIFIEDBAM -R ${REFERENCEFILE} --bqsr-recal-file ${RECALDATATABLE} -O $RECALIBRATEDBAM
+java -jar ${GATK} -T PrintReads -nct $CORES -I $DEDUPLIFIEDBAM -R ${REFERENCEFILE} -BQSR $RECALDATATABLE -EOQ -o $RECALIBRATEDBAM
 rm $DEDUPLIFIEDBAM $RECALDATATABLE
-parallel --halt 2 ${GATK} HaplotypeCaller -R ${REFERENCEFILE} -I $RECALIBRATEDBAM -L {1} ${BEDFILE} --heterozygosity 0.025 -ploidy 2 -o {2} ::: $SCATTEREDINTERVALS :::+ $SCATTEREDOUTCALLS
+parallel --halt 2 java -jar ${GATK} -T HaplotypeCaller --pair_hmm_implementation LOGLESS_CACHING -R ${REFERENCEFILE} -I $RECALIBRATEDBAM -L {1} ${BEDFILE} -ploidy 2 -o {2} ::: $SCATTEREDINTERVALS :::+ $SCATTEREDOUTCALLS
 rm $SCATTEREDINTERVALS $RECALIBRATEDBAM
-$PICARD SortVcf ${CMDOUTCALLS} O=${OUTFILE} SEQUENCE_DICTIONARY=${REFERENCEDICT}
+# java -cp ${GATK} org.broadinstitute.gatk.tools.CatVariants -R ${REFERENCEFILE} --outputFile ${OUTFILE} ${CMDOUTCALLS}
+# bcftools concat -a -Ov -o ${OUTCALLS} ${SCATTEREDOUTCALLS}
+$PICARD SortVcf ${CMDOUTCALLS} O=${OUTFILE} SEQUENCE_DICTIONARY=${REFERENCEDICT} TMP_DIR=/disks/dacelo/data/analyses/RB5_data_analysis/09_call_variants_RB5/tmp_0
 
 exit 0

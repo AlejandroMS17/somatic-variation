@@ -5,53 +5,31 @@
 #Using -s will remove the site for all samples if one of its samples' replicates don't match.
 
 =head1 NAME
-
 filt_with_replicates - Filter a VCF using replicate information.
-
 =head1 SYNOPSIS
-
 perl filt_with_replicates.pl [-s | --strict] [-m | --majority] [-g | --grouped int] [-h | -? | --help] <vcfile.vcf >filtered.vcf
-
 Options:
-
 =over 8
-
 =item --help		Prints help information
-
 =item --grouped		VCF samples aren't named, but in groups of int.
-
 =item --strict		Use strict filtering
-
 =item --majority 	Use majority rule filtering
-
 =back
-
 =head1 OPTIONS
-
 =over 8
-
 =item B<--help>
-
 Prints help information.
-
 =item B<--grouped INT>
-
 Use this option when the samples in the VCF aren't properly named OR when they are in a group.
 This will assume that every INT genotypes in the VCF are replicates of one sample.
 ONLY use this option when the replicates are in the correct order in the VCF.
 For example, replicates in a VCF with a grouping of 3 might be: 1, 1, 1, 2, 2, 2, 3, 3, 3.
-
 =item B<--strict>
-
 This will strictly filter, removing the site completely if there is one replicate that doesn't match.
 Normally, only the sample with the disagreement is removed, rather than all samples for that site.
-
 =back
-
 =head1 DESCRIPTION
-
 Filters a VCF file by removing sites for a sample if all its replicates don't match.
-
 =cut
 
 
@@ -120,15 +98,11 @@ exit;
 #------------------------------
 
 =head1 FUNCTIONS
-
 =over
-
 =item B<strict_filter()>
-
 Applies strict filtering to the VCF. That is,
 only outputs lines from the VCF where every
 replicate of every sample has the same genotype.
-
 =cut
 
 sub strict_filter{
@@ -158,14 +132,11 @@ sub strict_filter{
 }
 
 =item B<basic_filter()>
-
 Applies basic filtering to the VCF. That is,
 only outputs lines from the VCF where every
 replicate of some sample has the same genotype
 and there is a sample which differs from the others.
-
 =back
-
 =cut
 
 sub basic_filter{
@@ -209,4 +180,3 @@ sub most_common{
 	}
 	return ($common, $number)
 }
-

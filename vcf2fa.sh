@@ -2,7 +2,7 @@
 #bash vcf2fa.sh <file.vcf >out.fa
 #Takes vcf from STDIN (or -i) and prints a fasta file to STDOUT (or -o)
 
-USAGE="$0 [-d tmp_directory/] [-i file.vcf] [-o out.fa]"
+USAGE="$0 [-d /disks/dacelo/data/analyses/RB7_data_analysis/call_variants_RB7_RG_groups_correct/tmp_05] [-i file.vcf] [-o out.fa]"
 
 INFILE="-"
 OUTFILE="/dev/stdout"
@@ -44,4 +44,4 @@ FIFONAME=$(mktemp -u --tmpdir=$TMPDIR --suffix=.tab pipe_XXXXXXXX)
 mkfifo $FIFONAME;
 
 cat $INFILE | vcf-to-tab >$FIFONAME &
-vcf_tab_to_fasta_alignment.pl -i $FIFONAME >$OUTFILE
+perl vcf_tab_to_fasta_alignment.pl -i $FIFONAME >$OUTFILE
